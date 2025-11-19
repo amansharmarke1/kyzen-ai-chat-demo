@@ -2,3 +2,4 @@ streamlit
 torch
 transformers>=4.35.0
 accelerate
+llama-cpp-python  # For GGUF CPU inference
