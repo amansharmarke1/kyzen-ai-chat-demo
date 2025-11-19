@@ -2,7 +2,7 @@ import streamlit as st
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
-# Load model (runs on startup – fast for 3.8B)
+# Load model (cached, with dtype fix for deprecation)
 @st.cache_resource
 def load_model():
     model_name = "microsoft/Phi-3.5-mini-instruct"
@@ -11,10 +11,8 @@ def load_model():
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float16,
-        device_map="auto",
-        trust_remote_code=False,
-        low_cpu_mem_usage=True
+        dtype=torch.float16,  # Fix for deprecation (replaces torch_dtype)
+        low_cpu_mem_usage=True  # Faster load
     )
     return model, tokenizer
 
