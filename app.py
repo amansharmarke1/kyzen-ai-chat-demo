@@ -1,25 +1,35 @@
 import streamlit as st
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 import torch
 
-# Load Granite-4.0-H-350M (350M params, super fast on free CPU)
+# Load Granite-4.0-H-350M in INT8 (fits free tier RAM)
 @st.cache_resource
 def load_model():
     model_name = "ibm-granite/granite-4.0-h-350m"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    # INT8 quantization config (halves memory)
+    quantization_config = BitsAndBytesConfig(
+        load_in_8bit=True,
+        llm_int8_threshold=6.0,
+        llm_int8_skip_modules=["lm_head"]
+    )
+
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        dtype=torch.float16,  # Fixes deprecation warning
-        low_cpu_mem_usage=True  # Faster load on CPU
+        quantization_config=quantization_config,  # INT8 for low memory
+        device_map="cpu",  # Force CPU to avoid GPU conflicts
+        low_cpu_mem_usage=True,
+        torch_dtype=torch.float16  # Fix deprecation
     )
     return model, tokenizer
 
 model, tokenizer = load_model()
 
 st.title("Kyzen's Granite-4.0-H-350M Chat")
-st.write("Day 1 · 8-year-old laptop · 30-day monk mode to top-100 AI engineer. Powered by IBM Granite-4.0-H-350M (lightweight & fast).")
+st.write("Day 1 · 8-year-old laptop · 30-day monk mode to top-100 AI engineer. Powered by IBM Granite-4.0-H-350M (INT8 quantized for free tier).")
 
 # Chat interface
 if "messages" not in st.session_state:
@@ -37,14 +47,14 @@ if prompt := st.chat_input("Type your message..."):
     # Generate reply
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            # Granite prompt template (simple for instruct model)
+            # Granite prompt template
             input_text = f"<s>[INST] {prompt} [/INST]"
-            inputs = tokenizer(input_text, return_tensors="pt")
+            inputs = tokenizer(input_text, return_tensors="pt").to(model.device)
 
             with torch.no_grad():
                 outputs = model.generate(
                     **inputs,
-                    max_new_tokens=100,  # Short for 1–3s replies
+                    max_new_tokens=80,  # Even shorter for 1–3s replies
                     temperature=0.7,
                     do_sample=True,
                     pad_token_id=tokenizer.eos_token_id
