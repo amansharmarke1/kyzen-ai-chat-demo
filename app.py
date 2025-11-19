@@ -1,8 +1,8 @@
 import streamlit as st
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
-# Load Granite-4.0-H-350M (tries INT8, falls back to FP16 for free tier)
+# Load Granite-4.0-H-350M in FP16 (fits free tier RAM ~700 MB)
 @st.cache_resource
 def load_model():
     model_name = "ibm-granite/granite-4.0-h-350m"
@@ -10,37 +10,18 @@ def load_model():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    try:
-        # Try INT8 quantization
-        quantization_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            llm_int8_threshold=6.0,
-            llm_int8_skip_modules=["lm_head"]
-        )
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            quantization_config=quantization_config,
-            device_map="cpu",
-            low_cpu_mem_usage=True,
-            dtype=torch.float16
-        )
-        st.success("Loaded with INT8 quantization (low memory mode)")
-    except ImportError:
-        # Fallback to FP16 if bitsandbytes not available
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            device_map="cpu",
-            low_cpu_mem_usage=True,
-            dtype=torch.float16
-        )
-        st.warning("Loaded with FP16 fallback (standard mode)")
-
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        dtype=torch.float16,  # FP16 for efficiency (no deprecation)
+        device_map="cpu",  # Force CPU
+        low_cpu_mem_usage=True  # Faster load
+    )
     return model, tokenizer
 
 model, tokenizer = load_model()
 
 st.title("Kyzen's Granite-4.0-H-350M Chat")
-st.write("Day 1 · 8-year-old laptop · 30-day monk mode to top-100 AI engineer. Powered by IBM Granite-4.0-H-350M (optimized for free tier).")
+st.write("Day 1 · 8-year-old laptop · 30-day monk mode to top-100 AI engineer. Powered by IBM Granite-4.0-H-350M (FP16 for free tier).")
 
 # Chat interface
 if "messages" not in st.session_state:
@@ -65,7 +46,7 @@ if prompt := st.chat_input("Type your message..."):
             with torch.no_grad():
                 outputs = model.generate(
                     **inputs,
-                    max_new_tokens=80,
+                    max_new_tokens=80,  # Short for 1–3s replies
                     temperature=0.7,
                     do_sample=True,
                     pad_token_id=tokenizer.eos_token_id
