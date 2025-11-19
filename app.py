@@ -8,7 +8,7 @@ def load_model():
     llm = Llama(
         model_path="https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf",
         n_ctx=2048,  # Context length
-        n_threads=2,  # Limit threads for free tier (1 CPU)
+        n_threads=1,  # Limit threads for free tier (1 CPU)
         n_gpu_layers=0,  # CPU only
         verbose=False
     )
